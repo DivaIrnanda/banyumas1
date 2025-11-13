@@ -10,9 +10,31 @@ app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Nama fitur yang digunakan saat pelatihan model
 FEATURE_NAMES = [
-    'X1', 'X2', 'X3', 'X4', 'X5', 'X6', 'X7', 'X8', 'X9', 'X10', 'X11', 'X12'
+    'Akses Jangkauan', 'Jumlah Keluarga Miskin', 'Rasio Penduduk Miskin Desil 1', 
+    'Rumah tangga tanpa akses listrik', 'Produksi pangan', 'Luas lahan', 
+    'Rasio Sarana Pangan', 'Persentase balita stunting', 'Proporsi Penduduk Lanjut Usia', 
+    'Rasio Rumah Tangga Tanpa Air Bersih', 'Rasio Tenaga Kesehatan', 
+    'Total Keluarga Beresiko Stunting dan Keluarga rentan'
 ]
+
+# Pemetaan fitur input (X1, X2, ...) ke nama fitur deskriptif
+FEATURE_MAPPING = {
+    'X1': 'Akses Jangkauan',
+    'X2': 'Jumlah Keluarga Miskin',
+    'X3': 'Rasio Penduduk Miskin Desil 1',
+    'X4': 'Rumah tangga tanpa akses listrik',
+    'X5': 'Produksi pangan',
+    'X6': 'Luas lahan',
+    'X7': 'Rasio Sarana Pangan',
+    'X8': 'Persentase balita stunting',
+    'X9': 'Proporsi Penduduk Lanjut Usia',
+    'X10': 'Rasio Rumah Tangga Tanpa Air Bersih',
+    'X11': 'Rasio Tenaga Kesehatan',
+    'X12': 'Total Keluarga Beresiko Stunting dan Keluarga rentan'
+}
 
 # Global model and scaler
 model = None
@@ -37,7 +59,7 @@ def load_xgb_model():
 def load_scaler():
     """Load the scaler from the pickle file"""
     try:
-        scaler_path = os.path.join(BASE_DIR, 'scaler1.pkl')
+        scaler_path = os.path.join(BASE_DIR, 'scaler.pkl')
         with open(scaler_path, 'rb') as f:
             global scaler
             scaler = pickle.load(f)
@@ -101,11 +123,6 @@ def predict():
         }), 500
     
     try:
-        # Debug request info
-        print(f"Content-Type: {request.content_type}")
-        print(f"Method: {request.method}")
-        print(f"Headers: {dict(request.headers)}")
-        
         # Get JSON data from request
         try:
             data = request.get_json(force=True)
@@ -125,13 +142,14 @@ def predict():
         
         print(f"📊 Data received: {data}")
         
-        # Validate and extract features
+        # Validate and extract features, mapping input keys to feature names
         features_dict = {}
         missing_features = []
         invalid_features = []
         
         for feature_name in FEATURE_NAMES:
-            value = data.get(feature_name)
+            feature_key = [key for key, value in FEATURE_MAPPING.items() if value == feature_name][0]  # Mapping X1, X2, ...
+            value = data.get(feature_key)
             
             if value is None or value == '':
                 missing_features.append(feature_name)
@@ -164,6 +182,15 @@ def predict():
             }), 400
         
         print(f"✓ All features validated: {features_dict}")
+        
+        # Check if all features are 0
+        if all(value == 0 for value in features_dict.values()):
+            error_msg = 'Semua fitur tidak boleh bernilai 0.'
+            print(f"❌ {error_msg}")
+            return jsonify({
+                'success': False,
+                'error': error_msg
+            }), 400
         
         # Create DataFrame with correct feature order
         features_df = pd.DataFrame([features_dict], columns=FEATURE_NAMES)
@@ -252,7 +279,5 @@ if __name__ == '__main__':
     print("📌 Local: http://localhost:5000")
     print("📌 Network: http://0.0.0.0:5000")
     print("="*60 + "\n")
-
-from os import environ
-app.run(host='0.0.0.0', port=int(environ.get('PORT', 5000)))
-
+    
+    app.run(debug=True, host='0.0.0.0', port=5000, threaded=True)
